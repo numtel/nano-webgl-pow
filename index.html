@@ -32,6 +32,7 @@ form.addEventListener('submit', e => {
   const hash = form.elements[0].value;
   status.innerHTML = 'Starting generation...';
 
+  try {
   const workValue = NanoWebglPow(hash,
     workValue => {
       // Work value found!
@@ -47,6 +48,12 @@ form.addEventListener('submit', e => {
       if(n >= 4000) return true;
     }
   );
+  } catch(error) {
+    if(error.message === 'webgl2_required')
+      status.innerHTML = 'WebGL 2 is required for this demo';
+
+    throw error;
+  }
 
 }, false);
 </script>
