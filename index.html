@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<title>WebGL2 Nano Currency Proof of Work Generation Demo</title>
+<script src="nano-webgl-pow.js"></script>
+<style>
+body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 10px;}
+h1 { font-size: 110%; }
+label { display: block; }
+input { width: 100%; padding: 4px; font-size: 110%; box-sizing:border-box; }
+button { margin: 10px 0; }
+</style>
+</head>
+<body>
+<h1>WebGL2 Nano Currency Proof of Work Generation Demo</h1>
+<form>
+  <label>
+    Previous block hash:
+    <input value="1A66A5CEF5B149FEAE8F680ED7E32956F3B45A3D7914660265178BDED16446C8" />
+  </label>
+  <button>Calculate</button>
+</form>
+<p id="status"></p>
+<script>
+const form = document.forms[0];
+const status = document.getElementById('status');
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const start = Date.now();
+  const hash = form.elements[0].value;
+  status.innerHTML = 'Starting generation...';
+
+  const workValue = NanoWebglPow(hash,
+    workValue => {
+      // Work value found!
+      const calcTime = Math.round((Date.now() - start) / 1000);
+      if(!workValue)
+        status.innerHTML = 'Generation aborted after ' + calcTime + ' seconds.';
+      else
+        status.innerHTML = 'In ' + calcTime + ' seconds, found work value: ' + workValue;
+    },
+    n => {
+      status.innerHTML = 'Calculated ' + n + ' frames...';
+      // Abort if taking too long...
+      if(n >= 4000) return true;
+    }
+  );
+
+}, false);
+</script>
+</body>
+</html>
