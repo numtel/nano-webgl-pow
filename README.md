@@ -16,6 +16,14 @@ Due to using `window.requestAnimationFrame()` to prevent blocking the main threa
 * `callback` `<Function>` Function Called when work value found. Receives single string argument, work value as hex.
 * `progressCallback` `<Function>` Optional. Receives single argument: n, number of frames so far. Return true to abort.
 
+`window.NanoWebglPow.width, window.NanoWebglPow.height`
+
+Width, height properties for rendered frames during generation. Larger values will load the graphics card more.
+
+Values must be multiples of 256 but do not need to be the same. (i.e. 512x768 is ok, 510x768 is not)
+
+Default: 512x512
+
 ## Acknowledgements
 
 * [jaimehgb/RaiBlocksWebAssemblyPoW](https://github.com/jaimehgb/RaiBlocksWebAssemblyPoW) WASM implementation of proof of work generation

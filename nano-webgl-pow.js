@@ -31,9 +31,9 @@ function hex_array(hex, proto) {
 
 function calculate(hashHex, callback, progressCallback) {
   const canvas = document.createElement('canvas');
-  // 2 bytes of variance on 8 byte random work value per frame
-  canvas.width = 256;
-  canvas.height = 256;
+
+  canvas.width = window.NanoWebglPow.width;
+  canvas.height = window.NanoWebglPow.height;
 
   const gl = canvas.getContext('webgl2');
   if (!gl) {
@@ -44,6 +44,7 @@ function calculate(hashHex, callback, progressCallback) {
 
   // Vertext Shader
   const vsSource = `#version 300 es
+    precision highp float;
     layout (location=0) in vec4 position;
     layout (location=1) in vec2 uv;
 
@@ -58,6 +59,9 @@ function calculate(hashHex, callback, progressCallback) {
   const fsSource = `#version 300 es
     precision highp float;
     precision highp int;
+
+    const float MAX_X = ${canvas.width - 1}.;
+    const float MAX_Y = ${canvas.height - 1}.;
 
     in vec2 uv_pos;
     out vec4 fragColor;
@@ -173,11 +177,11 @@ function calculate(hashHex, callback, progressCallback) {
       v[b + 1] = (xor0 >> 31) ^ (xor1 << 1);
     }
 
-    uint uvec4_uint(uvec4 inval, uint byte0, uint byte1) {
+    uint uvec4_uint(uvec4 inval, uint byte0, uint byte1, uint byte2_xor, uint byte3_xor) {
       return (byte0 ^
         (byte1 << 8) ^
-        (inval.b << 16) ^
-        (inval.a << 24));
+        ((inval.b ^ byte2_xor) << 16) ^
+        ((inval.a ^ byte3_xor) << 24));
     }
 
     uint uvec4_uint(uvec4 inval) {
@@ -189,10 +193,14 @@ function calculate(hashHex, callback, progressCallback) {
 
     void main() {
       int i;
-      uint uv_x = uint(uv_pos.x*255.);
-      uint uv_y = uint(uv_pos.y*255.);
+      uint uv_x = uint(uv_pos.x*MAX_X);
+      uint uv_y = uint(uv_pos.y*MAX_Y);
+      uint x_pos = uv_x % 256u;
+      uint y_pos = uv_y % 256u;
+      uint x_index = (uv_x - x_pos) / 256u;
+      uint y_index = (uv_y - y_pos) / 256u;
       // blake2bUpdate, manually
-      m[0] = uvec4_uint(u_work0, uv_x, uv_y);
+      m[0] = uvec4_uint(u_work0, x_pos, y_pos, x_index, y_index);
       m[1] = uvec4_uint(u_work1);
       m[2] = uvec4_uint(u_hash0);
       m[3] = uvec4_uint(u_hash1);
@@ -254,10 +262,10 @@ function calculate(hashHex, callback, progressCallback) {
       // Threshold test
       if(digest[4] > 0xC0u && digest[5] == 0xFFu && digest[6] == 0xFFu && digest[7] == 0xFFu) {
         fragColor = vec4(
-          float(digest[4])/255., // Not used, just needs to be >0, nice for debugging
-          float(digest[5])/255., // Same as previous
-          float(uv_x)/255., // Return the 2 custom bytes used in work value
-          float(uv_y)/255. // Second custom byte
+          float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
+          float(y_index + 1u)/255., // Same as previous
+          float(x_pos)/255., // Return the 2 custom bytes used in work value
+          float(y_pos)/255.  // Second custom byte
         );
       }
     }`;
@@ -351,7 +359,14 @@ function calculate(hashHex, callback, progressCallback) {
       if(pixels[i] !== 0) {
         // Return the work value with the custom bits
         typeof callback === 'function' &&
-          callback(array_hex(work1,0,4) + array_hex([pixels[i+2],pixels[i+3], work0[2],work0[3]],0,4));
+          callback(
+            array_hex(work1, 0, 4) +
+            array_hex([
+              pixels[i+2],
+              pixels[i+3],
+              work0[2] ^ (pixels[i]-1),
+              work0[3] ^ (pixels[i+1]-1)
+            ], 0, 4));
         return;
       }
     }
@@ -364,5 +379,10 @@ function calculate(hashHex, callback, progressCallback) {
 }
 
 window.NanoWebglPow = calculate;
+// Both width and height must be multiple of 256, (one byte)
+// but do not need to be the same,
+// matching GPU capabilities is the aim
+window.NanoWebglPow.width = 256 * 2;
+window.NanoWebglPow.height = 256 * 2;
 
 })();
