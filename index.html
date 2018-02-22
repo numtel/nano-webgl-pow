@@ -39,7 +39,7 @@ button { margin: 10px 0; }
   </label>
   <button>Calculate</button>
 </form>
-<p id="status"></p>
+<ul id="status"></ul>
 <script>
 const form = document.forms[0];
 const status = document.getElementById('status');
@@ -49,16 +49,16 @@ const generationMethods = [
     try {
       const workValue = NanoWebglPow(hash, callback,
         n => {
-          status.innerHTML = 'Calculated ' + n + ' frames...';
+          setStatus('Calculated ' + n + ' frames...');
         }
       );
     } catch(error) {
       if(error.message === 'webgl2_required')
-        status.innerHTML = 'WebGL 2 is required for this demo';
+        setStatus('WebGL 2 is required for this demo');
       else if(error.message === 'invalid_hash')
-        status.innerHTML = 'Block hash must be 64 character hex string';
+        setStatus('Block hash must be 64 character hex string');
       else
-        status.innerHTML = 'An error has occurred';
+        setStatus('An error has occurred');
 
       throw error;
     }
@@ -91,16 +91,16 @@ const generationMethods = [
           // Bail if WebAssembly finished already
           if(finished) return true;
 
-          status.innerHTML = 'Calculated ' + n + ' frames...';
+          setStatus('Calculated ' + n + ' frames...');
         }
       );
     } catch(error) {
       if(error.message === 'webgl2_required')
-        status.innerHTML = 'WebGL 2 is required for this demo';
+        setStatus('WebGL 2 is required for this demo');
       else if(error.message === 'invalid_hash')
-        status.innerHTML = 'Block hash must be 64 character hex string';
+        setStatus('Block hash must be 64 character hex string');
       else
-        status.innerHTML = 'An error has occurred';
+        setStatus('An error has occurred');
 
       throw error;
     }
@@ -112,14 +112,18 @@ function generateMany(method, hash, count, callback, soFar) {
   const start = Date.now();
   method(hash, (workValue, whichMethod) => {
     const calcTime = (Date.now() - start) / 1000;
-    status.innerHTML =
+    setStatus(
       'In ' + calcTime + ' seconds, found work value: ' +
-      workValue + (whichMethod ? ' using ' + whichMethod : '');
+      workValue + (whichMethod ? ' using ' + whichMethod : ''));
 
     soFar.push(calcTime);
     if(soFar.length === count) callback(soFar);
     else generateMany(method, hash, count, callback, soFar);
   });
+}
+
+function setStatus(text) {
+  status.innerHTML = '<li>' + text + '</li>' + status.innerHTML;
 }
 
 form.addEventListener('submit', e => {
@@ -128,7 +132,7 @@ form.addEventListener('submit', e => {
   const hash = form.elements[0].value;
   const method = parseInt(form.elements[1].value, 10);
   const count = parseInt(form.elements[2].value, 10);
-  status.innerHTML = 'Starting generation...';
+  setStatus('Starting generation...');
 
   generateMany(generationMethods[method], hash, count, calcTimes => {
     const average = calcTimes.reduce((out, time, index) => {
@@ -140,8 +144,7 @@ form.addEventListener('submit', e => {
     }, 0);
 
     if(count > 1)
-      status.innerHTML =
-        'Generated ' + count + ' work values in average time of ' + average + ' seconds.';
+      setStatus('Generated ' + count + ' work values in average time of ' + average + ' seconds.');
   });
 
 }, false);
