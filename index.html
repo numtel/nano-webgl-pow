@@ -52,6 +52,8 @@ form.addEventListener('submit', e => {
   } catch(error) {
     if(error.message === 'webgl2_required')
       status.innerHTML = 'WebGL 2 is required for this demo';
+    else if(error.message == 'invalid_hash')
+      status.innerHTML = 'Block hash must be 64 character hex string';
     else
       status.innerHTML = 'An error has occurred';
 

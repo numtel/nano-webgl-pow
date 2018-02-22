@@ -21,11 +21,11 @@ function array_hex(arr, index, length) {
   return out;
 }
 
-function hex_array(hex, proto) {
-  proto = proto || Uint8Array;
-  const length = (hex.length / 2) | 0;
-  const out = new proto(length);
-  for (let i = 0; i < length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+function hex_reverse(hex) {
+  let out='';
+  for(let i=hex.length;i>0;i-=2) {
+    out+=hex.slice(i-2,i);
+  }
   return out;
 }
 
@@ -36,11 +36,16 @@ function calculate(hashHex, callback, progressCallback) {
   canvas.height = window.NanoWebglPow.height;
 
   const gl = canvas.getContext('webgl2');
-  if (!gl) {
+
+  if(!gl)
     throw new Error('webgl2_required');
-  }
+
+  if(!/^[A-F-a-f0-9]{64}$/.test(hashHex))
+    throw new Error('invalid_hash');
 
   gl.clearColor(0, 0, 0, 1);
+
+  const reverseHex = hex_reverse(hashHex);
 
   // Vertext Shader
   const vsSource = `#version 300 es
@@ -60,25 +65,12 @@ function calculate(hashHex, callback, progressCallback) {
     precision highp float;
     precision highp int;
 
-    const float MAX_X = ${canvas.width - 1}.;
-    const float MAX_Y = ${canvas.height - 1}.;
-
     in vec2 uv_pos;
     out vec4 fragColor;
 
     // Random work values, 2 bytes will be overwritten by texture pixel position
     uniform uvec4 u_work0;
     uniform uvec4 u_work1;
-
-    // Block hash constant in every pixel
-    uniform uvec4 u_hash0;
-    uniform uvec4 u_hash1;
-    uniform uvec4 u_hash2;
-    uniform uvec4 u_hash3;
-    uniform uvec4 u_hash4;
-    uniform uvec4 u_hash5;
-    uniform uvec4 u_hash6;
-    uniform uvec4 u_hash7;
 
     const int OUTLEN = 8; // work threshold score
     const int INLEN = 40; // work value (8) + block hash (32)
@@ -193,8 +185,8 @@ function calculate(hashHex, callback, progressCallback) {
 
     void main() {
       int i;
-      uint uv_x = uint(uv_pos.x*MAX_X);
-      uint uv_y = uint(uv_pos.y*MAX_Y);
+      uint uv_x = uint(uv_pos.x * ${canvas.width - 1}.);
+      uint uv_y = uint(uv_pos.y * ${canvas.height - 1}.);
       uint x_pos = uv_x % 256u;
       uint y_pos = uv_y % 256u;
       uint x_index = (uv_x - x_pos) / 256u;
@@ -202,17 +194,15 @@ function calculate(hashHex, callback, progressCallback) {
       // blake2bUpdate, manually
       m[0] = uvec4_uint(u_work0, x_pos, y_pos, x_index, y_index);
       m[1] = uvec4_uint(u_work1);
-      m[2] = uvec4_uint(u_hash0);
-      m[3] = uvec4_uint(u_hash1);
-      m[4] = uvec4_uint(u_hash2);
-      m[5] = uvec4_uint(u_hash3);
-      m[6] = uvec4_uint(u_hash4);
-      m[7] = uvec4_uint(u_hash5);
-      m[8] = uvec4_uint(u_hash6);
-      m[9] = uvec4_uint(u_hash7);
-      for(i=10;i<32;i++) {
-        m[i] = 0u;
-      }
+
+      m[2] = 0x${reverseHex.slice(56,64)}u;
+      m[3] = 0x${reverseHex.slice(48,56)}u;
+      m[4] = 0x${reverseHex.slice(40,48)}u;
+      m[5] = 0x${reverseHex.slice(32,40)}u;
+      m[6] = 0x${reverseHex.slice(24,32)}u;
+      m[7] = 0x${reverseHex.slice(16,24)}u;
+      m[8] = 0x${reverseHex.slice(8,16)}u;
+      m[9] = 0x${reverseHex.slice(0,8)}u;
 
       // blake2bInit
       for(i=0;i<16;i++) {
@@ -274,26 +264,23 @@ function calculate(hashHex, callback, progressCallback) {
   gl.shaderSource(vertexShader, vsSource);
   gl.compileShader(vertexShader);
 
-  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(vertexShader));
-  }
+  if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS))
+    throw gl.getShaderInfoLog(vertexShader);
 
   const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(fragmentShader, fsSource);
   gl.compileShader(fragmentShader);
 
-  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(fragmentShader));
-  }
+  if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS))
+    throw gl.getShaderInfoLog(fragmentShader);
 
   const program = gl.createProgram();
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
 
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error(gl.getProgramInfoLog(program));
-  }
+  if(!gl.getProgramParameter(program, gl.LINK_STATUS))
+    throw gl.getProgramInfoLog(program);
 
   gl.useProgram(program);
 
@@ -322,15 +309,8 @@ function calculate(hashHex, callback, progressCallback) {
   gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(1);
 
-  const blockHash = hex_array(hashHex, Array);
-
   const work0Location = gl.getUniformLocation(program, 'u_work0');
   const work1Location = gl.getUniformLocation(program, 'u_work1');
-
-  for(let i=0;i<blockHash.length;i+=4) {
-    let hashLocation = gl.getUniformLocation(program, 'u_hash' + (i/4));
-    gl.uniform4uiv(hashLocation, blockHash.slice(i,i+4));
-  }
 
   // Draw output until sucess or progessCb says to stop
   const work0 = new Uint8Array(4);
