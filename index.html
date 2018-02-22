@@ -76,7 +76,8 @@ const generationMethods = [
     pow_callback(workers, hash, () => {}, workValue => {
       // Stop WebGl from continuing
       finished = true;
-      callback(workValue, 'WebAssembly');
+      callback && callback(workValue, 'WebAssembly');
+      callback = null;
     });
 
     try {
@@ -85,7 +86,8 @@ const generationMethods = [
           // Stop WebAssembly from continuing
           pow_terminate(workers);
 
-          callback(workValue, 'WebGL');
+          callback && callback(workValue, 'WebGL');
+          callback = null;
         },
         n => {
           // Bail if WebAssembly finished already
@@ -117,7 +119,7 @@ function generateMany(method, hash, count, callback, soFar) {
       workValue + (whichMethod ? ' using ' + whichMethod : ''));
 
     soFar.push(calcTime);
-    if(soFar.length === count) callback(soFar);
+    if(soFar.length >= count) callback(soFar);
     else generateMany(method, hash, count, callback, soFar);
   });
 }
