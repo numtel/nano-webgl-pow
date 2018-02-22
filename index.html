@@ -4,21 +4,38 @@
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 <title>WebGL2 Nano Currency Proof of Work Generation Demo</title>
 <script src="nano-webgl-pow.js"></script>
+<script src="demo/startThreads.js"></script>
 <style>
 body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 10px;}
 h1 { font-size: 110%; }
-label { display: block; }
-input { width: 100%; padding: 4px; font-size: 110%; box-sizing:border-box; }
+label { display: block; margin-bottom:10px;}
+label span { display:inline-block; width: 70px; }
+input.hash { width: 100%; padding: 4px; font-size: 110%; box-sizing:border-box; }
 button { margin: 10px 0; }
 </style>
 </head>
 <body>
 <h1>WebGL2 Nano Currency Proof of Work Generation Demo</h1>
 <p><a href="https://github.com/numtel/nano-webgl-pow">View repository</a></p>
+<p>This demo will generate work values for a given hash.</p>
+<p>Use the method selector to compare this implementation (WebGL) to <a href="https://github.com/jaimehgb/RaiBlocksWebAssemblyPoW">jaimehgb's WebAssembly version</a>, as well as running both implementations in parallel.</p>
+<p>WebGL generation requires this page to remain open. If you switch to another tab, the generation will pause.</p>
 <form>
   <label>
     Previous block hash:
-    <input value="1A66A5CEF5B149FEAE8F680ED7E32956F3B45A3D7914660265178BDED16446C8" />
+    <input class="hash" value="1A66A5CEF5B149FEAE8F680ED7E32956F3B45A3D7914660265178BDED16446C8" />
+  </label>
+  <label>
+    <span>Method:</span>
+    <select>
+      <option value="0">WebGL</option>
+      <option value="1">WebAssembly (jaimehgb)</option>
+      <option value="2">Both at the same time</option>
+    </select>
+  </label>
+  <label>
+    <span>Count:</span>
+    <input type="number" value="1" min="1" max="1000" />
   </label>
   <button>Calculate</button>
 </form>
@@ -27,38 +44,104 @@ button { margin: 10px 0; }
 const form = document.forms[0];
 const status = document.getElementById('status');
 
+const generationMethods = [
+  function webgl(hash, callback) {
+    try {
+      const workValue = NanoWebglPow(hash, callback,
+        n => {
+          status.innerHTML = 'Calculated ' + n + ' frames...';
+        }
+      );
+    } catch(error) {
+      if(error.message === 'webgl2_required')
+        status.innerHTML = 'WebGL 2 is required for this demo';
+      else if(error.message === 'invalid_hash')
+        status.innerHTML = 'Block hash must be 64 character hex string';
+      else
+        status.innerHTML = 'An error has occurred';
+
+      throw error;
+    }
+  },
+
+  function wasm(hash, callback) {
+    const workers = pow_initiate(undefined, 'demo/');
+    pow_callback(workers, hash, () => {}, callback);
+  },
+
+  function both(hash, callback) {
+    let finished = false;
+
+    const workers = pow_initiate(undefined, 'demo/');
+    pow_callback(workers, hash, () => {}, workValue => {
+      // Stop WebGl from continuing
+      finished = true;
+      callback(workValue, 'WebAssembly');
+    });
+
+    try {
+      const workValue = NanoWebglPow(hash,
+        workValue => {
+          // Stop WebAssembly from continuing
+          pow_terminate(workers);
+
+          callback(workValue, 'WebGL');
+        },
+        n => {
+          // Bail if WebAssembly finished already
+          if(finished) return true;
+
+          status.innerHTML = 'Calculated ' + n + ' frames...';
+        }
+      );
+    } catch(error) {
+      if(error.message === 'webgl2_required')
+        status.innerHTML = 'WebGL 2 is required for this demo';
+      else if(error.message === 'invalid_hash')
+        status.innerHTML = 'Block hash must be 64 character hex string';
+      else
+        status.innerHTML = 'An error has occurred';
+
+      throw error;
+    }
+  }
+];
+
+function generateMany(method, hash, count, callback, soFar) {
+  soFar = soFar || [];
+  const start = Date.now();
+  method(hash, (workValue, whichMethod) => {
+    const calcTime = (Date.now() - start) / 1000;
+    status.innerHTML =
+      'In ' + calcTime + ' seconds, found work value: ' +
+      workValue + (whichMethod ? ' using ' + whichMethod : '');
+
+    soFar.push(calcTime);
+    if(soFar.length === count) callback(soFar);
+    else generateMany(method, hash, count, callback, soFar);
+  });
+}
+
 form.addEventListener('submit', e => {
   e.preventDefault();
   const start = Date.now();
   const hash = form.elements[0].value;
+  const method = parseInt(form.elements[1].value, 10);
+  const count = parseInt(form.elements[2].value, 10);
   status.innerHTML = 'Starting generation...';
 
-  try {
-    const workValue = NanoWebglPow(hash,
-      workValue => {
-        // Work value found!
-        const calcTime = Math.round((Date.now() - start) / 1000);
-        status.innerHTML = 'In ' + calcTime + ' seconds, found work value: ' + workValue;
-      },
-      n => {
-        status.innerHTML = 'Calculated ' + n + ' frames...';
-        // Abort if taking too long...
-        if(n >= 4000) {
-          status.innerHTML = 'Generation aborted due to too many frames, try again';
-          return true;
-        }
-      }
-    );
-  } catch(error) {
-    if(error.message === 'webgl2_required')
-      status.innerHTML = 'WebGL 2 is required for this demo';
-    else if(error.message === 'invalid_hash')
-      status.innerHTML = 'Block hash must be 64 character hex string';
-    else
-      status.innerHTML = 'An error has occurred';
-
-    throw error;
-  }
+  generateMany(generationMethods[method], hash, count, calcTimes => {
+    const average = calcTimes.reduce((out, time, index) => {
+      out+=time;
+      // Return average at end
+      if(index + 1 === calcTimes.length) return out/calcTimes.length;
+      // Not the end, keep building sum
+      return out;
+    }, 0);
+    status.innerHTML =
+      'Generated ' + count + ' work value' + (count !== 1 ? 's' : '') +
+      ' in average time of ' + average + ' seconds.';
+  });
 
 }, false);
 </script>
