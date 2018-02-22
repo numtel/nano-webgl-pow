@@ -169,20 +169,6 @@ function calculate(hashHex, callback, progressCallback) {
       v[b + 1] = (xor0 >> 31) ^ (xor1 << 1);
     }
 
-    uint uvec4_uint(uvec4 inval, uint byte0, uint byte1, uint byte2_xor, uint byte3_xor) {
-      return (byte0 ^
-        (byte1 << 8) ^
-        ((inval.b ^ byte2_xor) << 16) ^
-        ((inval.a ^ byte3_xor) << 24));
-    }
-
-    uint uvec4_uint(uvec4 inval) {
-      return (inval.r ^
-        (inval.g << 8) ^
-        (inval.b << 16) ^
-        (inval.a << 24));
-    }
-
     void main() {
       int i;
       uint uv_x = uint(uv_pos.x * ${canvas.width - 1}.);
@@ -192,9 +178,15 @@ function calculate(hashHex, callback, progressCallback) {
       uint x_index = (uv_x - x_pos) / 256u;
       uint y_index = (uv_y - y_pos) / 256u;
       // blake2bUpdate, manually
-      m[0] = uvec4_uint(u_work0, x_pos, y_pos, x_index, y_index);
-      m[1] = uvec4_uint(u_work1);
 
+      // First 2 work bytes are the x,y pos within the 256x256 area, the next
+      //  two bytes are modified from the random generated value, XOR'd with
+      //   the x,y area index of where this pixel is located
+      m[0] = (x_pos ^ (y_pos << 8) ^ ((u_work0.b ^ x_index) << 16) ^ ((u_work0.a ^ y_index) << 24));
+      // Remaining bytes are un-modified from the random generated value
+      m[1] = (u_work1.r ^ (u_work1.g << 8) ^ (u_work1.b << 16) ^ (u_work1.a << 24));
+
+      // Block hash
       m[2] = 0x${reverseHex.slice(56,64)}u;
       m[3] = 0x${reverseHex.slice(48,56)}u;
       m[4] = 0x${reverseHex.slice(40,48)}u;
@@ -251,6 +243,7 @@ function calculate(hashHex, callback, progressCallback) {
 
       // Threshold test
       if(digest[4] > 0xC0u && digest[5] == 0xFFu && digest[6] == 0xFFu && digest[7] == 0xFFu) {
+        // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
           float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
           float(y_index + 1u)/255., // Same as previous
@@ -312,7 +305,7 @@ function calculate(hashHex, callback, progressCallback) {
   const work0Location = gl.getUniformLocation(program, 'u_work0');
   const work1Location = gl.getUniformLocation(program, 'u_work1');
 
-  // Draw output until sucess or progessCb says to stop
+  // Draw output until success or progressCallback says to stop
   const work0 = new Uint8Array(4);
   const work1 = new Uint8Array(4);
   let n=0;
@@ -327,7 +320,7 @@ function calculate(hashHex, callback, progressCallback) {
     
     // Check with progressCallback every 100 frames
     if(n%100===0 && typeof progressCallback === 'function' && progressCallback(n))
-      return null;
+      return;
 
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

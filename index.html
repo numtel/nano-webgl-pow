@@ -34,25 +34,25 @@ form.addEventListener('submit', e => {
   status.innerHTML = 'Starting generation...';
 
   try {
-  const workValue = NanoWebglPow(hash,
-    workValue => {
-      // Work value found!
-      const calcTime = Math.round((Date.now() - start) / 1000);
-      if(!workValue)
-        status.innerHTML = 'Generation aborted after ' + calcTime + ' seconds.';
-      else
+    const workValue = NanoWebglPow(hash,
+      workValue => {
+        // Work value found!
+        const calcTime = Math.round((Date.now() - start) / 1000);
         status.innerHTML = 'In ' + calcTime + ' seconds, found work value: ' + workValue;
-    },
-    n => {
-      status.innerHTML = 'Calculated ' + n + ' frames...';
-      // Abort if taking too long...
-      if(n >= 4000) return true;
-    }
-  );
+      },
+      n => {
+        status.innerHTML = 'Calculated ' + n + ' frames...';
+        // Abort if taking too long...
+        if(n >= 4000) {
+          status.innerHTML = 'Generation aborted due to too many frames, try again';
+          return true;
+        }
+      }
+    );
   } catch(error) {
     if(error.message === 'webgl2_required')
       status.innerHTML = 'WebGL 2 is required for this demo';
-    else if(error.message == 'invalid_hash')
+    else if(error.message === 'invalid_hash')
       status.innerHTML = 'Block hash must be 64 character hex string';
     else
       status.innerHTML = 'An error has occurred';
