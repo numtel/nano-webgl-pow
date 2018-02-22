@@ -138,9 +138,10 @@ form.addEventListener('submit', e => {
       // Not the end, keep building sum
       return out;
     }, 0);
-    status.innerHTML =
-      'Generated ' + count + ' work value' + (count !== 1 ? 's' : '') +
-      ' in average time of ' + average + ' seconds.';
+
+    if(count > 1)
+      status.innerHTML =
+        'Generated ' + count + ' work values in average time of ' + average + ' seconds.';
   });
 
 }, false);
