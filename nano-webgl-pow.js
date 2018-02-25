@@ -97,7 +97,6 @@ function calculate(hashHex, callback, progressCallback) {
       2,24,0,4,22,14,10,6
     );
 
-    uint[16] ctx_h;
     // compression buffers, representing 16 uint64s as 32 uint32s
     uint v[32];
     uint m[32];
@@ -196,18 +195,13 @@ function calculate(hashHex, callback, progressCallback) {
       m[8] = 0x${reverseHex.slice(8,16)}u;
       m[9] = 0x${reverseHex.slice(0,8)}u;
 
-      // blake2bInit
-      for(i=0;i<16;i++) {
-        ctx_h[i] = BLAKE2B_IV32[i];
-      }
-      ctx_h[0] ^= 0x01010000u ^ uint(OUTLEN);
-
       // blake2bCompress
       // init work variables
       for(i=0;i<16;i++) {
-        v[i] = ctx_h[i];
+        v[i] = BLAKE2B_IV32[i];
         v[i+16] = BLAKE2B_IV32[i];
       }
+      v[0] ^= 0x01010000u ^ uint(OUTLEN);
 
       // low 64 bits of offset
       v[24] = v[24] ^ uint(INLEN);
@@ -233,7 +227,7 @@ function calculate(hashHex, callback, progressCallback) {
 
       // Threshold test, first 4 bytes not significant,
       //  only calculate digest of the second 4 bytes
-      if((ctx_h[1] ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
+      if((BLAKE2B_IV32[1] ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
         // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
           float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
