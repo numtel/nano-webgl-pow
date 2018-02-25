@@ -68,24 +68,45 @@ function calculate(hashHex, callback, progressCallback) {
     in vec2 uv_pos;
     out vec4 fragColor;
 
-    // Random work values, 2 bytes will be overwritten by texture pixel position
+    // Random work values
+    // First 2 bytes will be overwritten by texture pixel position
+    // Second 2 bytes will be modified if the canvas size is greater than 256x256
     uniform uvec4 u_work0;
+    // Last 4 bytes remain as generated externally
     uniform uvec4 u_work1;
 
-    const int OUTLEN = 8; // work threshold score
-    const int INLEN = 40; // work value (8) + block hash (32)
+    // Defined separately from uint v[32] below as the original value is required
+    // to calculate the second uint32 of the digest for threshold comparison
+    #define BLAKE2B_IV32_1 0x6A09E667u
 
-    // Initialization vector
-    const uint BLAKE2B_IV32[16] = uint[16](
-      0xF3BCC908u, 0x6A09E667u, 0x84CAA73Bu, 0xBB67AE85u,
+    // Both buffers represent 16 uint64s as 32 uint32s
+    // because that's what GLSL offers, just like Javascript
+
+    // Compression buffer, intialized to 2 instances of the initialization vector
+    // The following values have been modified from the BLAKE2B_IV:
+    // OUTLEN is constant 8 bytes
+    // v[0] ^= 0x01010000u ^ uint(OUTLEN);
+    // INLEN is constant 40 bytes: work value (8) + block hash (32)
+    // v[24] ^= uint(INLEN);
+    // It's always the "last" compression at this INLEN
+    // v[28] = ~v[28];
+    // v[29] = ~v[29];
+    uint v[32] = uint[32](
+      0xF2BDC900u, 0x6A09E667u, 0x84CAA73Bu, 0xBB67AE85u,
       0xFE94F82Bu, 0x3C6EF372u, 0x5F1D36F1u, 0xA54FF53Au,
       0xADE682D1u, 0x510E527Fu, 0x2B3E6C1Fu, 0x9B05688Cu,
-      0xFB41BD6Bu, 0x1F83D9ABu, 0x137E2179u, 0x5BE0CD19u
+      0xFB41BD6Bu, 0x1F83D9ABu, 0x137E2179u, 0x5BE0CD19u,
+      0xF3BCC908u, 0x6A09E667u, 0x84CAA73Bu, 0xBB67AE85u,
+      0xFE94F82Bu, 0x3C6EF372u, 0x5F1D36F1u, 0xA54FF53Au,
+      0xADE682F9u, 0x510E527Fu, 0x2B3E6C1Fu, 0x9B05688Cu,
+      0x04BE4294u, 0xE07C2654u, 0x137E2179u, 0x5BE0CD19u
     );
+    // Input data buffer
+    uint m[32];
 
-    // These are offsets into a uint64 buffer multiplied by 2 so they work
-    //  with a uint32 buffer since that's what the JS version does and that's
-    //  also the integer size in GLSL
+    // These are offsets into the input data buffer for each mixing step.
+    // They are multiplied by 2 from the original SIGMA values in
+    // the C reference implementation, which refered to uint64s.
     const int SIGMA82[192] = int[192](
       0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,28,20,8,16,18,30,26,12,2,24,
       0,4,22,14,10,6,22,16,24,0,10,4,30,26,20,28,6,12,14,2,18,8,14,18,6,2,26,
@@ -96,10 +117,6 @@ function calculate(hashHex, callback, progressCallback) {
       26,0,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,28,20,8,16,18,30,26,12,
       2,24,0,4,22,14,10,6
     );
-
-    // compression buffers, representing 16 uint64s as 32 uint32s
-    uint v[32];
-    uint m[32];
 
     // 64-bit unsigned addition
     // Sets v[a,a+1] += v[b,b+1]
@@ -176,7 +193,6 @@ function calculate(hashHex, callback, progressCallback) {
       uint y_pos = uv_y % 256u;
       uint x_index = (uv_x - x_pos) / 256u;
       uint y_index = (uv_y - y_pos) / 256u;
-      // blake2bUpdate, manually
 
       // First 2 work bytes are the x,y pos within the 256x256 area, the next
       //  two bytes are modified from the random generated value, XOR'd with
@@ -195,24 +211,6 @@ function calculate(hashHex, callback, progressCallback) {
       m[8] = 0x${reverseHex.slice(8,16)}u;
       m[9] = 0x${reverseHex.slice(0,8)}u;
 
-      // blake2bCompress
-      // init work variables
-      for(i=0;i<16;i++) {
-        v[i] = BLAKE2B_IV32[i];
-        v[i+16] = BLAKE2B_IV32[i];
-      }
-      v[0] ^= 0x01010000u ^ uint(OUTLEN);
-
-      // low 64 bits of offset
-      v[24] = v[24] ^ uint(INLEN);
-      // GLSL doesn't support the following operation
-      //  but it doesn't matter because INLEN is too low to be significant
-      // v[25] = v[25] ^ (INLEN / 0x100000000);
-
-      // It's always the "last" compression at this INLEN
-      v[28] = ~v[28];
-      v[29] = ~v[29];
-
       // twelve rounds of mixing
       for(i=0;i<12;i++) {
         B2B_G(0, 8, 16, 24, SIGMA82[i * 16 + 0], SIGMA82[i * 16 + 1]);
@@ -227,7 +225,7 @@ function calculate(hashHex, callback, progressCallback) {
 
       // Threshold test, first 4 bytes not significant,
       //  only calculate digest of the second 4 bytes
-      if((BLAKE2B_IV32[1] ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
+      if((BLAKE2B_IV32_1 ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
         // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
           float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
