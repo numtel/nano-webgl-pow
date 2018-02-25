@@ -330,7 +330,7 @@ function calculate(hashHex, callback, progressCallback) {
               pixels[i+3],
               work0[2] ^ (pixels[i]-1),
               work0[3] ^ (pixels[i+1]-1)
-            ], 0, 4));
+            ], 0, 4), n);
         return;
       }
     }

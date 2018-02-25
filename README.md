@@ -13,7 +13,7 @@ WebGL 2 provides bitwise operators unavailable in WebGL 1. These are required fo
 Due to using `window.requestAnimationFrame()` to prevent blocking the main thread during generation, the browser tab must remain open during generation.
 
 * `hashHex` `<String>` Previous Block Hash as Hex String
-* `callback` `<Function>` Function Called when work value found. Receives single string argument, work value as hex.
+* `callback` `<Function>` Called when work value found. Arguments: `work` work value as hex string, `n` number of frames calculated
 * `progressCallback` `<Function>` Optional. Receives single argument: n, number of frames so far. Return true to abort.
 
 `window.NanoWebglPow.width, window.NanoWebglPow.height`

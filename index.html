@@ -6,7 +6,7 @@
 <script src="nano-webgl-pow.js"></script>
 <script src="demo/startThreads.js"></script>
 <style>
-body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 10px;}
+body { font-family: sans-serif; max-width: 690px; margin: 20px auto; padding: 0 10px;}
 h1 { font-size: 110%; }
 label { display: block; margin-bottom:10px;}
 label span { display:inline-block; width: 70px; }
@@ -76,17 +76,17 @@ const generationMethods = [
     pow_callback(workers, hash, () => {}, workValue => {
       // Stop WebGl from continuing
       finished = true;
-      callback && callback(workValue, 'WebAssembly');
+      callback && callback(workValue, null, 'WebAssembly');
       callback = null;
     });
 
     try {
-      const workValue = NanoWebglPow(hash,
-        workValue => {
+      NanoWebglPow(hash,
+        (workValue, n) => {
           // Stop WebAssembly from continuing
           pow_terminate(workers);
 
-          callback && callback(workValue, 'WebGL');
+          callback && callback(workValue, n, 'WebGL');
           callback = null;
         },
         n => {
@@ -112,11 +112,17 @@ const generationMethods = [
 function generateMany(method, hash, count, callback, soFar) {
   soFar = soFar || [];
   const start = Date.now();
-  method(hash, (workValue, whichMethod) => {
+  method(hash, (workValue, n, whichMethod) => {
     const calcTime = (Date.now() - start) / 1000;
+
+    let hashes;
+    // Only WebGL method provides data for calculating hashes/second
+    if(n) hashes = NanoWebglPow.width * NanoWebglPow.height * n;
+
     setStatus(
       'In ' + calcTime + ' seconds, found work value: ' +
-      workValue + (whichMethod ? ' using ' + whichMethod : ''));
+      workValue + (whichMethod ? ' using ' + whichMethod : '')
+      + (hashes ? ' @ ' + Math.round(hashes / calcTime / 1000) + ' kilohash/second' : ''));
 
     soFar.push(calcTime);
     if(soFar.length >= count) callback(soFar);
