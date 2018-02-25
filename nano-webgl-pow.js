@@ -118,22 +118,10 @@ function calculate(hashHex, callback, progressCallback) {
       2,24,0,4,22,14,10,6
     );
 
-    // 64-bit unsigned addition
-    // Sets v[a,a+1] += v[b,b+1]
-    void ADD64AA (int a, int b) {
-      uint o0 = v[a] + v[b];
-      uint o1 = v[a + 1] + v[b + 1];
-      if (v[a] > 0xFFFFFFFFu - v[b]) { // did low 32 bits overflow?
-        o1++;
-      }
-      v[a] = o0;
-      v[a + 1] = o1;
-    }
-
-    // 64-bit unsigned addition
+    // 64-bit unsigned addition within the compression buffer
     // Sets v[a,a+1] += b
     // b0 is the low 32 bits of b, b1 represents the high 32 bits
-    void ADD64AC (int a, uint b0, uint b1) {
+    void add_uint64 (int a, uint b0, uint b1) {
       uint o0 = v[a] + b0;
       uint o1 = v[a + 1] + b1;
       if (v[a] > 0xFFFFFFFFu - b0) { // did low 32 bits overflow?
@@ -142,16 +130,15 @@ function calculate(hashHex, callback, progressCallback) {
       v[a] = o0;
       v[a + 1] = o1;
     }
+    // Sets v[a,a+1] += v[b,b+1]
+    void add_uint64 (int a, int b) {
+      add_uint64(a, v[b], v[b+1]);
+    }
 
     // G Mixing function
     void B2B_G (int a, int b, int c, int d, int ix, int iy) {
-      uint x0 = m[ix];
-      uint x1 = m[ix + 1];
-      uint y0 = m[iy];
-      uint y1 = m[iy + 1];
-
-      ADD64AA(a, b);
-      ADD64AC(a, x0, x1);
+      add_uint64(a, b);
+      add_uint64(a, m[ix], m[ix + 1]);
 
       // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated to the right by 32 bits
       uint xor0 = v[d] ^ v[a];
@@ -159,7 +146,7 @@ function calculate(hashHex, callback, progressCallback) {
       v[d] = xor1;
       v[d + 1] = xor0;
 
-      ADD64AA(c, d);
+      add_uint64(c, d);
 
       // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 24 bits
       xor0 = v[b] ^ v[c];
@@ -167,8 +154,8 @@ function calculate(hashHex, callback, progressCallback) {
       v[b] = (xor0 >> 24) ^ (xor1 << 8);
       v[b + 1] = (xor1 >> 24) ^ (xor0 << 8);
 
-      ADD64AA(a, b);
-      ADD64AC(a, y0, y1);
+      add_uint64(a, b);
+      add_uint64(a, m[iy], m[iy + 1]);
 
       // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated right by 16 bits
       xor0 = v[d] ^ v[a];
@@ -176,7 +163,7 @@ function calculate(hashHex, callback, progressCallback) {
       v[d] = (xor0 >> 16) ^ (xor1 << 16);
       v[d + 1] = (xor1 >> 16) ^ (xor0 << 16);
 
-      ADD64AA(c, d);
+      add_uint64(c, d);
 
       // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 63 bits
       xor0 = v[b] ^ v[c];
