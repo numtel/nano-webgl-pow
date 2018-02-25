@@ -231,18 +231,9 @@ function calculate(hashHex, callback, progressCallback) {
         B2B_G(6, 8, 18, 28, SIGMA82[i * 16 + 14], SIGMA82[i * 16 + 15]);
       }
 
-      for(i=0;i<16;i++) {
-        ctx_h[i] ^= v[i] ^ v[i + 16];
-      }
-
-      // blake2bFinal
-      uint[OUTLEN] digest;
-      for(i=0;i<OUTLEN;i++){
-        digest[i] = (ctx_h[i >> 2] >> (8u * uint(i & 3))) & 0xFFu;
-      }
-
-      // Threshold test
-      if(digest[4] > 0xC0u && digest[5] == 0xFFu && digest[6] == 0xFFu && digest[7] == 0xFFu) {
+      // Threshold test, first 4 bytes not significant,
+      //  only calculate digest of the second 4 bytes
+      if((ctx_h[1] ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
         // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
           float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
