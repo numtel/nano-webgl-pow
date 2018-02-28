@@ -10,7 +10,7 @@ body { font-family: sans-serif; max-width: 690px; margin: 20px auto; padding: 0 
 h1 { font-size: 110%; }
 label { display: block; margin-bottom:10px;}
 label span { display:inline-block; width: 70px; }
-input.hash { width: 100%; padding: 4px; font-size: 110%; box-sizing:border-box; }
+#hash { width: 100%; padding: 4px; font-size: 110%; box-sizing:border-box; }
 button { margin: 10px 0; }
 </style>
 </head>
@@ -23,7 +23,8 @@ button { margin: 10px 0; }
 <form>
   <label>
     Previous block hash:
-    <input class="hash" value="1A66A5CEF5B149FEAE8F680ED7E32956F3B45A3D7914660265178BDED16446C8" />
+    <a href="#" id="random-hash">Use Random</a>
+    <input id="hash" value="1A66A5CEF5B149FEAE8F680ED7E32956F3B45A3D7914660265178BDED16446C8" />
   </label>
   <label>
     <span>Method:</span>
@@ -43,6 +44,18 @@ button { margin: 10px 0; }
 <script>
 const form = document.forms[0];
 const status = document.getElementById('status');
+
+document.getElementById('random-hash').addEventListener('click', function(e) {
+  e.preventDefault();
+  document.getElementById('hash').value = randomHash;
+}, false);
+
+function randomHash() {
+  const raw = new Uint8Array(32);
+  window.crypto.getRandomValues(raw);
+  return raw.reduce((out,x) =>
+    out + (x.toString(16).length === 1 ? '0' : '') + x.toString(16),'');
+}
 
 const generationMethods = [
   function webgl(hash, callback) {
@@ -109,8 +122,10 @@ const generationMethods = [
   }
 ];
 
-function generateMany(method, hash, count, callback, soFar) {
+function generateMany(method, hashXX, count, callback, soFar) {
   soFar = soFar || [];
+  const hash = randomHash();
+  setStatus('Beginning generation for ' + hash);
   const start = Date.now();
   method(hash, (workValue, n, whichMethod) => {
     const calcTime = (Date.now() - start) / 1000;

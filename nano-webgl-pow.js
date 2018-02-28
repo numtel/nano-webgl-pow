@@ -180,13 +180,18 @@ function calculate(hashHex, callback, progressCallback) {
       uint y_pos = uv_y % 256u;
       uint x_index = (uv_x - x_pos) / 256u;
       uint y_index = (uv_y - y_pos) / 256u;
+      uint area_index = x_index + y_index * ${canvas.width / 256}u;
 
       // First 2 work bytes are the x,y pos within the 256x256 area, the next
-      //  two bytes are modified from the random generated value, XOR'd with
+      //  byte is modified from the random generated value, XOR'd with
       //   the x,y area index of where this pixel is located
-      m[0] = (x_pos ^ (y_pos << 8) ^ ((u_work0.b ^ x_index) << 16) ^ ((u_work0.a ^ y_index) << 24));
+      uint byte3 = u_work0.b + area_index;
+      if(byte3 > 255u) byte3 -= 256u;
+
+      m[0] = (x_pos ^ (y_pos << 8) ^ (byte3 << 16) ^ (u_work0.a << 24));
       // Remaining bytes are un-modified from the random generated value
-      m[1] = (u_work1.r ^ (u_work1.g << 8) ^ (u_work1.b << 16) ^ (u_work1.a << 24));
+      //m[1] = (u_work1.r ^ (u_work1.g << 8) ^ (u_work1.b << 16) ^ (u_work1.a << 24));
+      m[1] = 0xAAAAAAAAu;
 
       // Block hash
       m[2] = 0x${reverseHex.slice(56,64)}u;
@@ -215,8 +220,8 @@ function calculate(hashHex, callback, progressCallback) {
       if((BLAKE2B_IV32_1 ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
         // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
-          float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
-          float(y_index + 1u)/255., // Same as previous
+          1.0, // +1 to distinguish from 0 (unsuccessful) pixels
+          float(byte3)/255., // What value to
           float(x_pos)/255., // Return the 2 custom bytes used in work value
           float(y_pos)/255.  // Second custom byte
         );
@@ -276,14 +281,15 @@ function calculate(hashHex, callback, progressCallback) {
   const work1Location = gl.getUniformLocation(program, 'u_work1');
 
   // Draw output until success or progressCallback says to stop
-  const work0 = new Uint8Array(4);
-  const work1 = new Uint8Array(4);
+  const work1 = new Uint8Array([170,170,170,170]);
+  const work0 = new Uint8Array([170,170,170,170]);
+  const hashPerFrame = canvas.width*canvas.height;
   let n=0;
 
   function draw() {
     n++;
-    window.crypto.getRandomValues(work0);
-    window.crypto.getRandomValues(work1);
+//     window.crypto.getRandomValues(work0);
+//     window.crypto.getRandomValues(work1);
 
     gl.uniform4uiv(work0Location, Array.from(work0));
     gl.uniform4uiv(work1Location, Array.from(work1));
@@ -307,13 +313,25 @@ function calculate(hashHex, callback, progressCallback) {
             array_hex([
               pixels[i+2],
               pixels[i+3],
-              work0[2] ^ (pixels[i]-1),
-              work0[3] ^ (pixels[i+1]-1)
+              pixels[i+1],
+              work0[3]
             ], 0, 4), n);
         return;
       }
     }
     // Nothing found yet, try again
+    for(let i=0;i<4;i++) {
+      let difference = (hashPerFrame & (0xFF << (i * 8))) >> (i * 8);
+      if(work0[i] + difference > 255) {
+        if(i===3) throw new Error('work not found');
+        else {
+          work0[i+1] += 1;
+          work0[i] = work0[i] + difference - 255;
+        }
+      } else {
+        work0[i] += difference;
+      }
+    }
     window.requestAnimationFrame(draw);
   }
 
