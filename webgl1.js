@@ -409,7 +409,43 @@ function calculate(hashHex, callback, progressCallback) {
   bit1 = mod(v_buf[(a * 8) +7], 2.); \
   v_buf[(a*8) + 7] = (v_buf[(a*8) + 7] - bit1) / 2. + bit2 * 128.; \
 
+#define G(r,i,a,b,c,d) \
+  ADD64(a,b); \
+  ADD64_M(a,r,i,0); \
+  XOR64(d, a); \
+  ROTATE32(d); \
+  ADD64(c, d); \
+  XOR64(b, c); \
+  ROTATE24(b); \
+  ADD64(a,b); \
+  ADD64_M(a,r,i,1); \
+  XOR64(d, a); \
+  ROTATE16(d); \
+  ADD64(c, d); \
+  XOR64(b, c); \
+  ROTATE63(b); \
+
+#define ROUND(r) \
+  G(r,0,0,4,8,12); \
+  G(r,1,1,5,9,13); \
+  G(r,2,2,6,10,14); \
+  G(r,3,3,7,11,15); \
+  G(r,4,0,5,10,15); \
+  G(r,5,1,6,11,12); \
+  G(r,6,2,7,8,13); \
+  G(r,7,3,4,9,14); \
+
+
     void main() {
+      float uv_x = uv_pos.x * ${canvas.width - 1}.;
+      float uv_y = uv_pos.y * ${canvas.height - 1}.;
+      float x_pos = mod(uv_x, 256.);
+      float y_pos = mod(uv_y, 256.);
+      float x_index = (uv_x - x_pos) / 256.;
+      float y_index = (uv_y - y_pos) / 256.;
+      m_buf[0] = x_pos;
+      m_buf[1] = y_pos;
+
       // Buffer registers for macros
       float byt1, byt2, bit1, bit2, working;
       float rotbuf[4];
@@ -420,12 +456,30 @@ function calculate(hashHex, callback, progressCallback) {
         if(i>1 && i<8) m_buf[i] = float(u_work[i-2]);
         if(i>7 && i<40) m_buf[i] = float(u_hash[i-8]);
       }
-//       XOR64(2,5);
-//       ADD64(2,5);
-//       ADD64_M(2,11,7,1);
-//       SIGMA(0,0,0,1);
-//       ROTATE63(0);
-      gl_FragColor = vec4(uv_pos.r,m_buf[2]/255.,v_buf[1]/255.,v_buf[127]/255.);
+
+      ROUND( 0 );
+//       ROUND( 1 );
+//       ROUND( 2 );
+//       ROUND( 3 );
+//       ROUND( 4 );
+//       ROUND( 5 );
+//       ROUND( 6 );
+//       ROUND( 7 );
+//       ROUND( 8 );
+//       ROUND( 9 );
+//       ROUND( 10 );
+//       ROUND( 11 );
+
+      // Re-load the first 8 bytes of the IV into the second 8 bytes of v_buf
+      for(int i=8;i<16;i++) {
+        v_buf[i] = float(u_iv[i -8]);
+      }
+      // Calculate digest of the first 8 bytes in the second 8 bytes
+      XOR64(1,0);
+      XOR64(1,8);
+
+      if(v_buf[12] > 192. && v_buf[13] == 255. && v_buf[14] == 255. && v_buf[15] == 255.)
+        gl_FragColor = vec4(v_buf[12]/255.,v_buf[13]/255.,v_buf[14]/255.,v_buf[15]/255.);
     }
   `;
 
@@ -481,7 +535,7 @@ function calculate(hashHex, callback, progressCallback) {
   gl.enableVertexAttribArray(1);
 
   const workLocation = gl.getUniformLocation(program, 'u_work');
-  const work = new Int32Array([1,35,255,224,4,5]);
+  const work = new Int32Array([ 112, 208, 212, 21, 139, 57 ]);
 
   const ivLocation = gl.getUniformLocation(program, 'u_iv');
   gl.uniform1iv(ivLocation, BLAKE2B_IV_MOD);
@@ -515,9 +569,10 @@ function calculate(hashHex, callback, progressCallback) {
 console.log(pixels);
 
     // Check the pixels for any success
-//     for(let i=0;i<pixels.length;i+=4) {
-//       if(pixels[i] !== 0) {
-//         // Return the work value with the custom bits
+    for(let i=0;i<pixels.length;i+=4) {
+      if(pixels[i] !== 0) {
+        // Return the work value with the custom bits
+        console.log(pixels.slice(i, i+4));
 //         typeof callback === 'function' &&
 //           callback(
 //             array_hex(work1, 0, 4) +
@@ -527,9 +582,9 @@ console.log(pixels);
 //               work0[2] ^ (pixels[i]-1),
 //               work0[3] ^ (pixels[i+1]-1)
 //             ], 0, 4), n);
-//         return;
-//       }
-//     }
+        return;
+      }
+    }
     // Nothing found yet, try again
     //window.requestAnimationFrame(draw);
   }
