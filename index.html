@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 <title>WebGL2 Nano Currency Proof of Work Generation Demo</title>
-<script src="nano-webgl-pow.js"></script>
+<script src="webgl1.js"></script>
 <script src="demo/startThreads.js"></script>
 <style>
 body { font-family: sans-serif; max-width: 690px; margin: 20px auto; padding: 0 10px;}
@@ -39,6 +39,7 @@ button { margin: 10px 0; }
   </label>
   <button>Calculate</button>
 </form>
+<canvas id="canvas" width="128" height="128"></canvas>
 <ul id="status"></ul>
 <script>
 const form = document.forms[0];
@@ -58,7 +59,7 @@ const generationMethods = [
       else if(error.message === 'invalid_hash')
         setStatus('Block hash must be 64 character hex string');
       else
-        setStatus('An error has occurred');
+        setStatus('An error has occurred' + error);
 
       throw error;
     }
@@ -156,6 +157,8 @@ form.addEventListener('submit', e => {
   });
 
 }, false);
+
+form.dispatchEvent(new Event('submit'));
 </script>
 </body>
 </html>
