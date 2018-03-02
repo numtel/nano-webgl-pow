@@ -6,6 +6,14 @@ See the [demo for a working implementation](https://numtel.github.io/nano-webgl-
 
 WebGL 2 provides bitwise operators unavailable in WebGL 1. These are required for the Blake2B calculation. As of time of writing, WebGL2 is supported in Chrome and Firefox, on desktop and Android. See the [WebGL2 compatibility table](https://caniuse.com/#feat=webgl2) for more information.
 
+## Installation
+
+Download the source code from the repository or with NPM.
+
+```
+npm install nano-webgl-pow
+```
+
 ## Implements
 
 `window.NanoWebglPow(hashHex, callback, progressCallback);`

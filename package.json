@@ -1,0 +1,26 @@
+{
+  "name": "nano-webgl-pow",
+  "version": "1.0.0",
+  "description": "Nano Currency WebGL2 proof of work generation",
+  "main": "nano-webgl-pow.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/numtel/nano-webgl-pow.git"
+  },
+  "keywords": [
+    "nano",
+    "xrb",
+    "raiblocks",
+    "webgl",
+    "pow"
+  ],
+  "author": "numtel <ben@latenightsketches.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/numtel/nano-webgl-pow/issues"
+  },
+  "homepage": "https://github.com/numtel/nano-webgl-pow#readme"
+}
