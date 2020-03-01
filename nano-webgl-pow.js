@@ -29,7 +29,7 @@ function hex_reverse(hex) {
   return out;
 }
 
-function calculate(hashHex, callback, progressCallback) {
+function calculate(hashHex, threshold, callback, progressCallback) {
   const canvas = document.createElement('canvas');
 
   canvas.width = window.NanoWebglPow.width;
@@ -212,7 +212,7 @@ function calculate(hashHex, callback, progressCallback) {
 
       // Threshold test, first 4 bytes not significant,
       //  only calculate digest of the second 4 bytes
-      if((BLAKE2B_IV32_1 ^ v[1] ^ v[17]) > 0xFFFFFFC0u) {
+      if((BLAKE2B_IV32_1 ^ v[1] ^ v[17]) > ` + threshold + `u) {
         // Success found, return pixel data so work value can be constructed
         fragColor = vec4(
           float(x_index + 1u)/255., // +1 to distinguish from 0 (unsuccessful) pixels
@@ -287,7 +287,7 @@ function calculate(hashHex, callback, progressCallback) {
 
     gl.uniform4uiv(work0Location, Array.from(work0));
     gl.uniform4uiv(work1Location, Array.from(work1));
-    
+
     // Check with progressCallback every 100 frames
     if(n%100===0 && typeof progressCallback === 'function' && progressCallback(n))
       return;
