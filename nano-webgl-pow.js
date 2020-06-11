@@ -3,13 +3,16 @@
 // Author:  numtel <ben@latenightsketches.com>
 // License: MIT
 
-// window.NanoWebglPow(hashHex, callback, progressCallback);
+// window.NanoWebglPow(hashHex, callback, progressCallback, threshold);
 // @param hashHex           String   Previous Block Hash as Hex String
 // @param callback          Function Called when work value found
 //   Receives single string argument, work value as hex
 // @param progressCallback  Function Optional
 //   Receives single argument: n, number of frames so far
 //   Return true to abort
+// @param threshold         String   Optional difficulty threshold (default=0xFFFFFFF8 since v21)
+
+const defaultThreshold = '0xFFFFFFF8'
 
 (function(){
 
@@ -29,7 +32,7 @@ function hex_reverse(hex) {
   return out;
 }
 
-function calculate(hashHex, threshold, callback, progressCallback) {
+function calculate(hashHex, callback, progressCallback, threshold = defaultThreshold) {
   const canvas = document.createElement('canvas');
 
   canvas.width = window.NanoWebglPow.width;
