@@ -16,7 +16,7 @@ npm install nano-webgl-pow
 
 ## Implements
 
-`window.NanoWebglPow(hashHex, threshold, callback, progressCallback);`
+`window.NanoWebglPow(hashHex, callback, progressCallback, threshold);`
 
 Due to using `window.requestAnimationFrame()` to prevent blocking the main thread during generation, the browser tab must remain open during generation.
 
