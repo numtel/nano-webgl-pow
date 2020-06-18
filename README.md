@@ -16,13 +16,16 @@ npm install nano-webgl-pow
 
 ## Implements
 
-`window.NanoWebglPow(hashHex, callback, progressCallback);`
+`window.NanoWebglPow(hashHex, callback, progressCallback, threshold);`
 
 Due to using `window.requestAnimationFrame()` to prevent blocking the main thread during generation, the browser tab must remain open during generation.
 
 * `hashHex` `<String>` Previous Block Hash as Hex String
 * `callback` `<Function>` Called when work value found. Arguments: `work` work value as hex string, `n` number of frames calculated
 * `progressCallback` `<Function>` Optional. Receives single argument: n, number of frames so far. Return true to abort.
+* `threshold` `<String>` Optional work difficulty as 32bit (default if ommited is 0xFFFFFFF8). Original up to v20 = 0xFFFFFFC0, v21 Send,Change = 0xFFFFFFF8, v21 Receive = 0xFFFFFE00. Max is 64x from original which is 0xFFFFFFFF.
+
+[More on how to calculate threshold values](https://docs.nano.org/integration-guides/the-basics/#calculating-work)
 
 `window.NanoWebglPow.width, window.NanoWebglPow.height`
 
