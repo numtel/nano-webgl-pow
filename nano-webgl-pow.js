@@ -10,9 +10,7 @@
 // @param progressCallback  Function Optional
 //   Receives single argument: n, number of frames so far
 //   Return true to abort
-// @param threshold         String   Optional difficulty threshold (default=0xFFFFFFF8 since v21)
-
-const defaultThreshold = '0xFFFFFFF8'
+// @param threshold         Number|String   Optional difficulty threshold (default=0xFFFFFFF8 since v21)
 
 (function(){
 
@@ -32,7 +30,9 @@ function hex_reverse(hex) {
   return out;
 }
 
-function calculate(hashHex, callback, progressCallback, threshold = defaultThreshold) {
+function calculate(hashHex, callback, progressCallback, threshold = '0xFFFFFFF8') {
+  if(typeof threshold === 'number') threshold = '0x' + threshold.toString(16);
+
   const canvas = document.createElement('canvas');
 
   canvas.width = window.NanoWebglPow.width;
